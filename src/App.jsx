@@ -1,5 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import { Box, Flex, Heading, Button, useColorMode } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  Heading,
+  Button,
+  useColorMode,
+  useColorModeValue,
+} from "@chakra-ui/react";
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 
 import Dashboard from "./pages/Dashboard";
@@ -7,25 +14,31 @@ import Locations from "./pages/Locations";
 
 function App() {
   const { colorMode, toggleColorMode } = useColorMode();
+  const headingColor = useColorModeValue("gray.800", "yellow.200");
+  const headingIcon = colorMode === "light" ? "🌤️" : "🌙";
 
   return (
     <Router>
       <Box p={4}>
         <Flex justify="space-between" align="center" mb={6}>
-          <Heading size="3xl">🌤️ </Heading>
+          <Heading size="3xl" color={headingColor}>
+            {headingIcon} 
+          </Heading>
           <Flex gap={2}>
-            <Button as={Link} to="/">Locations</Button>
-            <Button as={Link} to="/dashboard">Dashboard</Button>
+            <Button as={Link} to="/" colorScheme="blue" variant="outline">
+              Locations
+            </Button>
+            <Button as={Link} to="/dashboard" colorScheme="teal" variant="outline">
+              Dashboard
+            </Button>
             <Button onClick={toggleColorMode}>
               {colorMode === "light" ? <MoonIcon /> : <SunIcon />}
             </Button>
           </Flex>
         </Flex>
-
         <Routes>
           <Route path="/" element={<Locations />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          
         </Routes>
       </Box>
     </Router>

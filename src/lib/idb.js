@@ -1,15 +1,11 @@
-// src/lib/idb.js
+
 const DB_NAME = "weather-db";
-const DB_VERSION = 5; // ✅ เพิ่ม version ใหม่ (เพิ่มได้เรื่อย ๆ)
+const DB_VERSION = 5; //  bump version เพื่อให้ schema ใหม่ทำงาน
 const WEATHER_STORE = "weather";
 const GEO_STORE = "geoCache";
 
-/**
- * Open or upgrade IndexedDB safely.
- * - ถ้า DB schema เปลี่ยน → upgrade
- * - ถ้า version mismatch → ล้าง DB แล้วสร้างใหม่อัตโนมัติ
- */
-function openDB() {
+
+export function openDB() {
   return new Promise((resolve, reject) => {
     let req;
     try {
@@ -22,7 +18,6 @@ function openDB() {
 
     req.onupgradeneeded = () => {
       const db = req.result;
-      console.log("🔧 Upgrading IndexedDB schema → version", DB_VERSION);
       if (!db.objectStoreNames.contains(WEATHER_STORE))
         db.createObjectStore(WEATHER_STORE, { keyPath: "key" });
       if (!db.objectStoreNames.contains(GEO_STORE))
@@ -31,15 +26,13 @@ function openDB() {
 
     req.onsuccess = () => {
       const db = req.result;
-
-      // ✅ ตรวจว่า store ครบไหม
       const requiredStores = [WEATHER_STORE, GEO_STORE];
       const missing = requiredStores.filter(
         (s) => !db.objectStoreNames.contains(s)
       );
 
       if (missing.length > 0) {
-        console.warn("⚠️ Missing stores:", missing, "→ rebuilding DB");
+        console.warn(" Missing stores:", missing, "→ rebuilding DB");
         db.close();
         indexedDB.deleteDatabase(DB_NAME);
         const retry = indexedDB.open(DB_NAME, DB_VERSION);
@@ -50,7 +43,6 @@ function openDB() {
           );
         };
         retry.onsuccess = () => {
-          console.log("✅ Recreated missing stores successfully");
           resolve(retry.result);
         };
         retry.onerror = () => reject(retry.error);
@@ -61,8 +53,7 @@ function openDB() {
     };
 
     req.onerror = () => {
-      console.warn("❌ IndexedDB error:", req.error);
-      // หากเปิดไม่ได้จริง → ล้างทิ้งแล้วเปิดใหม่
+      console.warn(" IndexedDB error:", req.error);
       indexedDB.deleteDatabase(DB_NAME);
       const retry = indexedDB.open(DB_NAME, DB_VERSION);
       retry.onupgradeneeded = () => {
@@ -71,7 +62,6 @@ function openDB() {
         db.createObjectStore(GEO_STORE, { keyPath: "key" });
       };
       retry.onsuccess = () => {
-        console.log("✅ IndexedDB reset complete");
         resolve(retry.result);
       };
       retry.onerror = () => reject(retry.error);
@@ -79,7 +69,7 @@ function openDB() {
   });
 }
 
-/* ---------------- Weather Cache (เหมือนเดิม) ---------------- */
+/* ---------------- Weather Cache ---------------- */
 export async function idbGet(key) {
   try {
     const db = await openDB();
@@ -136,7 +126,6 @@ export async function idbCleanupExpired(maxAgeMs = 30 * 24 * 60 * 60 * 1000) {
     });
 
   await Promise.all([cleanup(WEATHER_STORE), cleanup(GEO_STORE)]);
-  console.log("🧹 IndexedDB cleanup complete");
 }
 
 /* ---------------- Geo Cache ---------------- */
@@ -164,7 +153,18 @@ export async function geoSet(lat, lon, value) {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(GEO_STORE, "readwrite");
       const store = tx.objectStore(GEO_STORE);
-      const r = store.put({ key, value, updatedAt: Date.now() });
+
+      const r = store.put({
+        key,
+        value: {
+          name: value.name || `Custom (${lat.toFixed(2)}, ${lon.toFixed(2)})`,
+          lat,
+          lon,
+          timezone: value.timezone || "Asia/Bangkok",
+        },
+        updatedAt: Date.now(),
+      });
+
       r.onsuccess = () => resolve(true);
       r.onerror = () => reject(r.error);
     });

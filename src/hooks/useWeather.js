@@ -1,24 +1,8 @@
-// src/hooks/useWeather.js
-import { useState, useEffect, useRef } from "react";
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchWeather } from "../api/weather";
 import { idbGet, idbSet, idbCleanupExpired } from "../lib/idb";
 
-/**
- * useWeather - ดึงข้อมูลสภาพอากาศ (offline-first + IndexedDB caching)
- * -------------------------------------------------------------
- * ✅ โหลดจาก IndexedDB ก่อน (offline-first)
- * ✅ ถ้ามี cache สดกว่า staleTime → ใช้ cache ทันที แล้ว refresh พื้นหลัง
- * ✅ ถ้า cache เก่า → fetch network แล้วอัปเดต cache
- * ✅ มี retry (default 2 ครั้ง)
- * ✅ รีเฟรชข้อมูลทุก 30 นาที (client fallback)
- * ✅ ล้าง cache เก่าที่หมดอายุ (> 3 ชั่วโมง)
- *
- * @param {number} lat - ละติจูด
- * @param {number} lon - ลองจิจูด
- * @param {object} options
- * @param {number} options.staleTime - อายุ cache (มิลลิวินาที)
- * @param {number} options.retries - จำนวนครั้ง retry ถ้า fetch ล้มเหลว
- */
 export function useWeather(lat, lon, { staleTime = 3 * 60 * 60 * 1000, retries = 2 } = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,17 +30,14 @@ export function useWeather(lat, lon, { staleTime = 3 * 60 * 60 * 1000, retries =
             setError(null);
           }
 
-          // ✅ เก็บข้อมูลใน IndexedDB เพื่อใช้งาน offline
           await idbSet(key, normalized);
-
-          return; // สำเร็จแล้วออกจาก loop
+          return;
         } catch (e) {
           attempt++;
           if (attempt > retries) {
             if (!cancelled) setError(e);
             return;
           }
-          // 🔁 exponential backoff
           await new Promise((r) => setTimeout(r, 300 * attempt));
         } finally {
           if (showLoading && !cancelled) setLoading(false);
@@ -67,25 +48,17 @@ export function useWeather(lat, lon, { staleTime = 3 * 60 * 60 * 1000, retries =
     (async () => {
       setLoading(true);
       try {
-        // 🧹 ล้าง cache ที่หมดอายุ (> 3 ชม.)
         await idbCleanupExpired();
-
-        // 1️⃣ โหลดจาก IndexedDB ก่อน (offline-first)
         const cached = await idbGet(key);
+        const result = cached?.value || cached || null;
 
-        if (cached) {
-          console.log("✅ Loaded weather from cache:", key);
-          if (!cancelled) setData(cached);
-
-          // ตรวจสอบอายุ cache จาก idb.js (มันจะคืน null ถ้าเกินอายุ)
-          // ดังนั้นไม่ต้องตรวจเองอีก
-          // แต่เราจะยังคง refresh พื้นหลังเพื่อให้ข้อมูลใหม่
+        if (result) {
+          if (!cancelled) setData(result);
           fetchAndCache(false);
           setLoading(false);
           return;
         }
 
-        // 2️⃣ ถ้าไม่มี cache → fetch จาก network
         await fetchAndCache(true);
       } catch (e) {
         if (!cancelled) setError(e);
@@ -94,7 +67,7 @@ export function useWeather(lat, lon, { staleTime = 3 * 60 * 60 * 1000, retries =
       }
     })();
 
-    // 3️⃣ รีเฟรชข้อมูลอัตโนมัติทุก 30 นาที
+    // auto refresh ทุก 30 นาที
     const interval = setInterval(() => fetchAndCache(false), 30 * 60_000);
 
     return () => {
@@ -103,23 +76,22 @@ export function useWeather(lat, lon, { staleTime = 3 * 60 * 60 * 1000, retries =
     };
   }, [lat, lon, staleTime, retries]);
 
-  return { data, loading, error };
-}
+  const refreshWeather = useCallback(async () => {
+    if (!lat || !lon) return;
+    await idbSet(`weather:${lat}:${lon}`, null); 
+    await new Promise((r) => setTimeout(r, 200)); 
+    const res = await fetchWeather(lat, lon);
+    const normalized = normalize(res);
+    await idbSet(`weather:${lat}:${lon}`, normalized);
+    setData(normalized);
+  }, [lat, lon]);
 
-/**
- * normalize - แปลงข้อมูลจาก API ให้มีโครงสร้างมาตรฐาน
- */
+  return { data, loading, error, refreshWeather };
+}
 function normalize(res) {
   return {
-    current: res.current || res.current_weather || {},
-    hourly: res.hourly || { time: [], temperature_2m: [] },
-    daily:
-      res.daily || {
-        time: [],
-        temperature_2m_max: [],
-        temperature_2m_min: [],
-        precipitation_sum: [],
-      },
-    raw: res,
+    current: res.current || {},
+    hourly: res.hourly || {},
+    daily: res.daily || {},
   };
 }

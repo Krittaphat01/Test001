@@ -1,16 +1,10 @@
-/**
- * apiClient.js
- * --------------
- * 🔹 ฟังก์ชันกลางสำหรับเรียก API ฝั่ง Backend
- * 🔹 รองรับ token, retry, และการจัดการ error
- */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || ""; // เช่น "https://api.example.com"
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ""; 
 
 /**
- * เรียก API โดยแนบ token (ถ้ามี)
- * @param {string} endpoint เช่น "/api/locations"
- * @param {object} options method, body, headers, token, retries
+ * เรียก API โดยแนบ token 
+ * @param {string} endpoint 
+ * @param {object} options 
  */
 export async function apiFetch(
   endpoint,
@@ -18,7 +12,7 @@ export async function apiFetch(
 ) {
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint}`;
 
-  // เตรียม header
+
   const finalHeaders = new Headers(headers);
   if (token) finalHeaders.set("Authorization", `Bearer ${token}`);
   if (body && !finalHeaders.has("Content-Type")) {
@@ -35,7 +29,6 @@ export async function apiFetch(
     try {
       const res = await fetch(url, opts);
 
-      // 🔒 Token หมดอายุ → ออกจากระบบ
       if (res.status === 401) {
         console.warn("Unauthorized — token expired or invalid.");
         localStorage.removeItem("token");
@@ -43,7 +36,7 @@ export async function apiFetch(
         throw new Error("Unauthorized");
       }
 
-      // ❌ Error status
+
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         const err = new Error(`HTTP ${res.status} ${res.statusText} ${text}`);
@@ -51,7 +44,7 @@ export async function apiFetch(
         throw err;
       }
 
-      // ✅ Response OK → พยายาม parse JSON ถ้าไม่ใช่ก็คืน text
+
       const text = await res.text();
       try {
         return JSON.parse(text);
@@ -61,7 +54,7 @@ export async function apiFetch(
     } catch (e) {
       if (attempt === retries) throw e;
 
-      // ⏳ exponential backoff ก่อน retry
+
       const delay = 500 * Math.pow(2, attempt);
       console.warn(`Retrying ${url} in ${delay}ms (attempt ${attempt + 1})`);
       await new Promise((r) => setTimeout(r, delay));

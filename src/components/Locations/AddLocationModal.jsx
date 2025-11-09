@@ -29,7 +29,6 @@ export default function AddLocationModal({ isOpen, onClose, onSubmit }) {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // ✅ เมื่อคลิกในแผนที่ จะได้รับข้อมูล name, lat, lon, timezone
   const handleSelect = ({ name, lat, lon, timezone }) => {
     setForm({
       name: name || "Unknown",
@@ -57,7 +56,6 @@ export default function AddLocationModal({ isOpen, onClose, onSubmit }) {
         <ModalCloseButton />
         <ModalBody>
           <VStack spacing={3} align="stretch">
-            {/* ✅ ช่อง City Name — แสดงแบบ readonly ถ้ามาจากแผนที่ */}
             <FormControl isRequired>
               <FormLabel>City Name</FormLabel>
               <Input
@@ -104,15 +102,9 @@ export default function AddLocationModal({ isOpen, onClose, onSubmit }) {
                 <option value="Europe/London">Europe/London</option>
               </Select>
             </FormControl>
-
-            <Text fontSize="sm" color="gray.500" mt={2}>
-              🗺️ Click anywhere on the map to auto-fill city name and coordinates.
-            </Text>
-
             <MapPicker onSelect={handleSelect} />
           </VStack>
         </ModalBody>
-
         <ModalFooter>
           <Button colorScheme="blue" mr={3} onClick={handleSubmit}>
             Add City

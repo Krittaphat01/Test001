@@ -1,16 +1,9 @@
-/**
- * src/api/apiClient.js
- * --------------------
- * ฟังก์ชันกลางสำหรับเรียก API ฝั่ง Backend
- * รองรับ token, retry, และ error-handling
- */
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || ""; // เช่น "https://api.example.com"
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ""; 
 
 /**
- * เรียก API โดยแนบ token (ถ้ามี)
- * @param {string} endpoint เช่น "/api/locations"
- * @param {object} options method, body, headers, token, retries
+ * เรียก API โดยแนบ token 
+ * @param {string} endpoint เ
+ * @param {object} options 
  */
 export async function apiFetch(
   endpoint,

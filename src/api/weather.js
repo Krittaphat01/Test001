@@ -1,9 +1,8 @@
-// src/api/weather.js
 import { idbGet, idbSet } from "../lib/idb";
 
 const API_BASE = "https://api.open-meteo.com/v1";
 
-// ✅ ดึงข้อมูลสภาพอากาศหลัก
+
 export async function fetchWeather(lat, lon, timezone = "Asia/Bangkok", retries = 2) {
   if (!lat || !lon) throw new Error("Missing latitude/longitude");
 
@@ -17,7 +16,7 @@ export async function fetchWeather(lat, lon, timezone = "Asia/Bangkok", retries 
   });
 
   const url = `${API_BASE}/forecast?${params.toString()}`;
-  console.log("🌦️ Fetching weather:", url);
+  console.log("Fetching weather:", url);
 
   let attempt = 0;
   while (attempt <= retries) {
@@ -29,14 +28,14 @@ export async function fetchWeather(lat, lon, timezone = "Asia/Bangkok", retries 
       return normalizeWeatherResponse(json);
     } catch (err) {
       attempt++;
-      console.warn(`🌧️ fetchWeather attempt ${attempt} failed:`, err);
+      console.warn(` fetchWeather attempt ${attempt} failed:`, err);
       if (attempt > retries) throw err;
       await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
     }
   }
 }
 
-// ✅ ดึงข้อมูลย้อนหลัง (Backfill)
+
 export async function fetchWeatherBackfill(lat, lon, timezone = "Asia/Bangkok", days = 3) {
   const end = new Date();
   const start = new Date(end);
@@ -56,7 +55,6 @@ export async function fetchWeatherBackfill(lat, lon, timezone = "Asia/Bangkok", 
   });
 
   const url = `${API_BASE}/forecast?${params.toString()}`;
-  console.log("⏪ Fetching backfill:", url);
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Backfill failed: HTTP ${res.status}`);
@@ -64,28 +62,52 @@ export async function fetchWeatherBackfill(lat, lon, timezone = "Asia/Bangkok", 
   return normalizeWeatherResponse(json);
 }
 
-// ✅ ใช้ใน CompareModal (IndexedDB offline-first)
-export async function getDailyData(lat, lon, timezone = "Asia/Bangkok") {
-  const key = `weather:${lat}:${lon}`;
-  const MAX_AGE_MS = 3 * 60 * 60 * 1000;
+
+export async function getDailyData(
+  lat,
+  lon,
+  timezone = "Asia/Bangkok",
+  start,
+  end,
+  retries = 2
+) {
+
+  const rangeKey = start && end ? `:${start}_${end}` : "";
+  const key = `weather:${lat}:${lon}${rangeKey}`;
+  const MAX_AGE_MS = 3 * 60 * 60 * 1000; 
 
   try {
     const cached = await idbGet(key);
     if (cached?.daily && cached.updatedAt) {
       const age = Date.now() - cached.updatedAt;
       if (age < MAX_AGE_MS) {
-        console.log("✅ Using cached daily data:", key);
         return cached.daily;
       }
     }
 
-    const url =
+    let url =
       `${API_BASE}/forecast?latitude=${lat}&longitude=${lon}` +
-      `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=${timezone}`;
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum` +
+      `&timezone=${encodeURIComponent(timezone)}`;
+    if (start && end) {
+      url += `&start_date=${start}&end_date=${end}`;
+    }
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch daily data");
-    const json = await res.json();
+    let json = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        json = await res.json();
+        break; 
+      } catch (err) {
+        console.warn(` Fetch attempt ${attempt + 1} failed:`, err);
+        if (attempt === retries) throw err;
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1))); 
+      }
+    }
+
+    if (!json?.daily) throw new Error("Invalid response format");
 
     const normalized = {
       time: json.daily?.time || [],
@@ -100,10 +122,16 @@ export async function getDailyData(lat, lon, timezone = "Asia/Bangkok") {
       updatedAt: Date.now(),
     });
 
-    console.log("💾 Cached new daily data:", key);
     return normalized;
   } catch (err) {
-    console.error("❌ getDailyData error:", err);
+    console.error(" getDailyData error:", err);
+
+    const fallback = await idbGet(key);
+    if (fallback?.daily) {
+      console.warn(" Using fallback cached data (offline mode)");
+      return fallback.daily;
+    }
+
     return {
       time: [],
       temperature_2m_max: [],
@@ -113,7 +141,6 @@ export async function getDailyData(lat, lon, timezone = "Asia/Bangkok") {
   }
 }
 
-// ✅ Normalizer shared
 function normalizeWeatherResponse(res) {
   return {
     current: res.current || res.current_weather || {},

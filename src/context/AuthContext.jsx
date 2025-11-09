@@ -4,7 +4,6 @@ import { AuthContext } from "./AuthContextValue";
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem("token") || null);
 
-  // login/logout เหมือนเดิม
   const login = useCallback((newToken) => {
     setToken(newToken);
     localStorage.setItem("token", newToken);
@@ -16,7 +15,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * ✅ authFetch — ดึงข้อมูลจาก API พร้อมแนบ Authorization header
+   * authFetch — ดึงข้อมูลจาก API พร้อมแนบ Authorization header
    * ใช้แทน fetch() ปกติใน component
    * ตัวอย่าง: const res = await authFetch("/api/weather/latest");
    */
@@ -37,7 +36,6 @@ export function AuthProvider({ children }) {
         throw new Error(`Request failed: ${res.status} ${res.statusText}`);
       }
 
-      // แปลง response อัตโนมัติเป็น JSON
       try {
         return await res.json();
       } catch {

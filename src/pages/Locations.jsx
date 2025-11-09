@@ -9,10 +9,10 @@ import {
   Center,
   HStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import LocationsList from "../components/Locations/LocationsList";
 import AddLocationModal from "../components/Locations/AddLocationModal";
-import CompareModal from "../components/Locations/CompareModal"; // ✅ ใหม่
+import CompareModal from "../components/Locations/CompareModal"; 
 import { fetchLocations, addLocation } from "../api/locations";
 import { useAuth } from "../hooks/useAuth";
 
@@ -25,11 +25,7 @@ export default function Locations() {
   const compareDisclosure = useDisclosure();
   const toast = useToast();
 
-  useEffect(() => {
-    loadLocations();
-  }, []);
-
-  async function loadLocations() {
+  const loadLocations = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchLocations(token);
@@ -40,14 +36,18 @@ export default function Locations() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [token, toast]);
+
+  useEffect(() => {
+    loadLocations();
+  }, [loadLocations]);
 
   async function handleAdd(location) {
     try {
       await addLocation(location, token);
       toast({ title: "City added!", status: "success" });
       addDisclosure.onClose();
-      loadLocations(); // refresh list
+      loadLocations();
     } catch {
       toast({ title: "Add failed", status: "error" });
     }
@@ -55,18 +55,15 @@ export default function Locations() {
 
   return (
     <Box p={4}>
-      <Heading mb={4}>📍 Tracked Locations</Heading>
-
-      {/* ✅ ปุ่ม Add + Compare */}
+      <Heading mb={4}>Tracked Locations</Heading>
       <HStack mb={4} spacing={3}>
         <Button colorScheme="blue" onClick={addDisclosure.onOpen}>
           + Add City
         </Button>
         <Button colorScheme="purple" onClick={compareDisclosure.onOpen} isDisabled={locations.length < 2}>
-          🔍 Compare Mode
+          Compare Mode
         </Button>
       </HStack>
-
       {loading ? (
         <Center mt={10}>
           <Spinner size="xl" />
@@ -74,14 +71,11 @@ export default function Locations() {
       ) : (
         <LocationsList locations={locations} />
       )}
-
       <AddLocationModal
         isOpen={addDisclosure.isOpen}
         onClose={addDisclosure.onClose}
         onSubmit={handleAdd}
       />
-
-      {/* ✅ Modal Compare */}
       <CompareModal
         isOpen={compareDisclosure.isOpen}
         onClose={compareDisclosure.onClose}

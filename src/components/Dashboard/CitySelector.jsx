@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Box,
   Input,
@@ -6,39 +6,93 @@ import {
   ListItem,
   Text,
   Flex,
-  IconButton,
+  Spinner,
   useOutsideClick,
+  useColorModeValue,
 } from "@chakra-ui/react";
-import { ChevronDownIcon, ChevronUpIcon, SearchIcon } from "@chakra-ui/icons";
+import { SearchIcon } from "@chakra-ui/icons";
+import { openDB } from "../../lib/idb";
+import { flushSync } from "react-dom";
 
-const CITY_LIST = [
-  { name: "Bangkok", lat: 13.7563, lon: 100.5018 },
-  { name: "Chiang Mai", lat: 18.7883, lon: 98.9853 },
-  { name: "Phuket", lat: 7.8804, lon: 98.3923 },
-  { name: "Khon Kaen", lat: 16.4419, lon: 102.8350 },
-  { name: "Pattaya", lat: 12.9236, lon: 100.8825 },
-];
-
-export default function CitySelector({ onSelect }) {
+export default function CitySelector({ onSelect, selectedCity }) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [cities, setCities] = useState([]);
+  const [loading, setLoading] = useState(true);
   const ref = useRef();
+
+  const bgColor = useColorModeValue("white", "gray.700");
+  const borderColor = useColorModeValue("gray.200", "gray.600");
+  const hoverBg = useColorModeValue("gray.50", "gray.600");
+  const textColor = useColorModeValue("gray.800", "gray.100");
+  const placeholderColor = useColorModeValue("gray.400", "gray.500");
 
   useOutsideClick({
     ref,
     handler: () => setIsOpen(false),
   });
 
-  const filtered = CITY_LIST.filter((c) =>
+  useEffect(() => {
+    async function loadCities() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction("weather", "readonly");
+        const store = tx.objectStore("weather");
+        const req = store.get("locations");
+
+        req.onsuccess = (e) => {
+          const data = e.target.result;
+          if (data && Array.isArray(data.value)) {
+            const allCities = data.value.map((loc) => ({
+              name: loc.name || "Unknown",
+              lat: loc.lat,
+              lon: loc.lon,
+              timezone: loc.timezone || "Asia/Bangkok",
+            }));
+            setCities(allCities);
+          } else {
+            console.warn("⚠️ No locations found in IndexedDB.");
+            setCities([]);
+          }
+          setLoading(false);
+        };
+
+        req.onerror = () => {
+          console.warn(" Failed to read IndexedDB weather store");
+          setLoading(false);
+        };
+      } catch (err) {
+        console.warn(" IndexedDB not available", err);
+        setLoading(false);
+      }
+    }
+
+    loadCities();
+  }, []);
+
+
+  const handleSelect = (city) => {
+    flushSync(() => {
+      setQuery(""); 
+    });
+    onSelect(city);
+    setIsOpen(false);
+  };
+
+  const filtered = cities.filter((c) =>
     c.name.toLowerCase().includes(query.toLowerCase())
   );
 
-  const handleSelect = (city) => {
-    setSelected(city);
-    onSelect({ ...city, timezone: "Asia/Bangkok" });
-    setQuery("");
-    setIsOpen(false);
+  const handleFocus = () => {
+    if (!isOpen) setIsOpen(true);
+  };
+
+
+  const getPlaceholderText = () => {
+    if (selectedCity) {
+      return selectedCity.name; 
+    }
+    return "Search or select a city..."; 
   };
 
   return (
@@ -49,19 +103,27 @@ export default function CitySelector({ onSelect }) {
         borderRadius="md"
         px={3}
         py={2}
-        cursor="pointer"
-        onClick={() => setIsOpen(!isOpen)}
+        bg={bgColor}
+        borderColor={borderColor}
+        color={textColor}
+        cursor="text"
+        transition="all 0.2s"
         _hover={{ borderColor: "blue.400" }}
+        _focusWithin={{ borderColor: "blue.500" }}
       >
         <SearchIcon color="gray.400" mr={2} />
-        <Text flex="1" color={selected ? "black" : "gray.400"}>
-          {selected ? selected.name : "Select a city..."}
-        </Text>
-        <IconButton
-          icon={isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
-          variant="ghost"
-          size="sm"
-          aria-label="toggle"
+        <Input
+          placeholder={getPlaceholderText()}
+          value={query}
+          onFocus={handleFocus}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!isOpen) setIsOpen(true); 
+          }}
+          variant="unstyled"
+          color={textColor}
+          _placeholder={{ color: placeholderColor }}
+          flex="1"
         />
       </Flex>
 
@@ -71,40 +133,46 @@ export default function CitySelector({ onSelect }) {
           top="100%"
           left={0}
           right={0}
-          bg="white"
+          bg={bgColor}
           borderRadius="md"
           mt={1}
+          borderWidth="1px"
+          borderColor={borderColor}
           shadow="md"
           zIndex={10}
-          p={2}
+          transition="all 0.2s"
         >
-          <Input
-            placeholder="Search cities..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            mb={2}
-            size="sm"
-          />
-          <List maxH="180px" overflowY="auto">
-            {filtered.length > 0 ? (
-              filtered.map((c) => (
+          {loading ? (
+            <Flex justify="center" py={4}>
+              <Spinner size="sm" />
+            </Flex>
+          ) : filtered.length > 0 ? (
+            <List maxH="200px" overflowY="auto">
+              {filtered.map((c) => (
                 <ListItem
-                  key={c.name}
-                  p={2}
+                  key={`${c.lat}-${c.lon}`}
+                  px={3}
+                  py={2}
                   borderRadius="md"
                   cursor="pointer"
-                  _hover={{ bg: "gray.50" }}
+                  _hover={{ bg: hoverBg }}
                   onClick={() => handleSelect(c)}
+                  color={textColor}
                 >
                   {c.name}
                 </ListItem>
-              ))
-            ) : (
-              <Text color="gray.400" textAlign="center" py={2}>
-                No results
-              </Text>
-            )}
-          </List>
+              ))}
+            </List>
+          ) : (
+            <Text
+              color={placeholderColor}
+              textAlign="center"
+              py={3}
+              fontSize="sm"
+            >
+              No results found
+            </Text>
+          )}
         </Box>
       )}
     </Box>

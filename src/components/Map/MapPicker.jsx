@@ -6,7 +6,6 @@ import L from "leaflet";
 import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-// ✅ Fix: marker icons in Vite
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconUrl,
@@ -35,7 +34,7 @@ async function getCityName(lat, lon) {
       timezone: data.address.timezone || "Asia/Bangkok",
     };
   } catch (e) {
-    console.warn("⚠️ reverse geocode failed", e);
+    console.warn(" reverse geocode failed", e);
     return { name: "Unknown", timezone: "Asia/Bangkok" };
   }
 }
@@ -49,10 +48,9 @@ function LocationMarker({ onSelect }) {
       const { lat, lng } = e.latlng;
       setPosition([lat, lng]);
 
-      // 🔍 Fetch name & timezone
       const info = await getCityName(lat, lng);
 
-      // ✅ ส่งข้อมูลกลับไปให้ Modal
+
       onSelect({
         name: info.name,
         lat,
@@ -77,10 +75,9 @@ export default function MapPicker({ onSelect }) {
       h={{ base: "300px", md: "400px" }}
       position="relative"
     >
-      {/* ✅ กล่องเลื่อนถ้าเกินพื้นที่ */}
       <Box w="100%" h="100%" overflow="auto">
         <MapContainer
-          center={[18.7883, 98.9853]} // Default: Chiang Mai
+          center={[18.7883, 98.9853]} 
           zoom={6}
           style={{
             height: "100%",
