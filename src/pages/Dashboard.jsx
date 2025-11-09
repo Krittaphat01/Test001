@@ -4,18 +4,33 @@ import WeatherCard from "../components/Dashboard/WeatherCard";
 import HourlyChart from "../components/Dashboard/HourlyChart";
 import DailyChart from "../components/Dashboard/DailyChart";
 import { useWeather } from "../hooks/useWeather";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 
 export default function Dashboard() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const queryCity = searchParams.get("location") || "Chiang Mai";
+  const queryMetric = searchParams.get("metric") || "temperature";
+
   const [selectedCity, setSelectedCity] = useState({
-    name: "Chiang Mai",
+    name: queryCity,
     lat: 18.7883,
     lon: 98.9853,
     timezone: "Asia/Bangkok",
   });
 
-  const [selectedMetric, setSelectedMetric] = useState("temperature");
+  const [selectedMetric, setSelectedMetric] = useState(queryMetric);
+
   const { data, loading, error } = useWeather(selectedCity.lat, selectedCity.lon);
+
+
+  useEffect(() => {
+    setSearchParams({
+      location: selectedCity.name,
+      metric: selectedMetric,
+    });
+  }, [selectedCity, selectedMetric, setSearchParams]);
 
   if (loading)
     return (
@@ -27,14 +42,13 @@ export default function Dashboard() {
   if (error)
     return (
       <Center h="60vh">
-        <Heading color="red.400">⚠️Failed to load weather data</Heading>
+        <Heading color="red.400"> Failed to load weather data</Heading>
       </Center>
     );
 
   const current = data?.current || {};
   const hourly = data?.hourly || {};
   const daily = data?.daily || {};
-
   const updatedAt = data?.updatedAt || Date.now();
 
   const metrics = [
@@ -75,27 +89,56 @@ export default function Dashboard() {
   return (
     <Box p={4}>
       <Heading mb={4}> Weather Dashboard</Heading>
-      <CitySelector onSelect={setSelectedCity} />
-      <Grid
-        templateColumns={{ base: "1fr", md: "repeat(4, 1fr)" }}
-        gap={4}
-        mt={4}
-      >
-        {metrics.map((m) => (
-          <WeatherCard
-            key={m.key}
-            title={m.title}
-            value={m.value}
-            updatedAt={updatedAt} 
-            isActive={selectedMetric === m.key}
-            onClick={() => setSelectedMetric(m.key)}
-          />
-        ))}
-      </Grid>
-      <Box mt={8}>
-        <HourlyChart data={hourly} metric={selectedMetric} />
-        <DailyChart data={daily} mt={8} />
-      </Box>
-    </Box>
+      <CitySelector
+        value={selectedCity}
+        onSelect={(city) => {
+        setSelectedCity(city);
+        setSearchParams({
+      location: city.name,
+      metric: selectedMetric,
+        });
+      }}
+      />
+      <Box
+    mt={6}
+    p={4}
+    borderWidth="1px"
+    borderRadius="xl"
+    shadow="md"
+    bg="gray.50"
+    _dark={{ bg: "gray.700" }}
+  >
+    <Grid
+      templateColumns={{ base: "1fr", md: "repeat(4, 1fr)" }}
+      gap={4}
+      mb={6}
+    >
+      {metrics.map((m) => (
+        <WeatherCard
+          key={m.key}
+          title={m.title}
+          value={m.value}
+          updatedAt={updatedAt}
+          isActive={selectedMetric === m.key}
+          onClick={() => {
+            setSelectedMetric(m.key);
+            setSearchParams({
+              location: selectedCity.name,
+              metric: m.key,
+            });
+          }}
+        />
+      ))}
+    </Grid>
+
+    {/* กราฟรายชั่วโมง */}
+    <HourlyChart data={hourly} metric={selectedMetric} />
+  </Box>
+
+  {/* 🔹 กราฟรายวัน (อยู่นอก box) */}
+  <Box mt={8}>
+    <DailyChart data={daily} />
+  </Box>
+</Box>
   );
 }

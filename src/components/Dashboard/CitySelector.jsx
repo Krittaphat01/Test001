@@ -6,25 +6,26 @@ import {
   ListItem,
   Text,
   Flex,
-  Spinner,
+  IconButton,
   useOutsideClick,
+  Spinner,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { SearchIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, ChevronUpIcon, SearchIcon } from "@chakra-ui/icons";
 import { openDB } from "../../lib/idb";
-import { flushSync } from "react-dom";
 
-export default function CitySelector({ onSelect, selectedCity }) {
+export default function CitySelector({ value, onSelect }) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [cities, setCities] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const ref = useRef();
 
   const bgColor = useColorModeValue("white", "gray.700");
+  const textColor = useColorModeValue("gray.800", "gray.100");
   const borderColor = useColorModeValue("gray.200", "gray.600");
   const hoverBg = useColorModeValue("gray.50", "gray.600");
-  const textColor = useColorModeValue("gray.800", "gray.100");
   const placeholderColor = useColorModeValue("gray.400", "gray.500");
 
   useOutsideClick({
@@ -38,22 +39,26 @@ export default function CitySelector({ onSelect, selectedCity }) {
         const db = await openDB();
         const tx = db.transaction("weather", "readonly");
         const store = tx.objectStore("weather");
-        const req = store.get("locations");
+        const req = store.getAll();
 
         req.onsuccess = (e) => {
-          const data = e.target.result;
-          if (data && Array.isArray(data.value)) {
-            const allCities = data.value.map((loc) => ({
-              name: loc.name || "Unknown",
-              lat: loc.lat,
-              lon: loc.lon,
-              timezone: loc.timezone || "Asia/Bangkok",
-            }));
-            setCities(allCities);
-          } else {
-            console.warn("⚠️ No locations found in IndexedDB.");
-            setCities([]);
+          const allRecords = e.target.result;
+          let allLocations = [];
+
+          for (const record of allRecords) {
+            const { key, value } = record;
+            if (key === "locations" && Array.isArray(value)) {
+              allLocations = value.map((loc) => ({
+                name: loc.name || "Unknown",
+                lat: loc.lat,
+                lon: loc.lon,
+                timezone: loc.timezone || "Asia/Bangkok",
+              }));
+            }
           }
+
+          setCities(allLocations);
+          setLocations(allLocations);
           setLoading(false);
         };
 
@@ -70,29 +75,15 @@ export default function CitySelector({ onSelect, selectedCity }) {
     loadCities();
   }, []);
 
-
-  const handleSelect = (city) => {
-    flushSync(() => {
-      setQuery(""); 
-    });
-    onSelect(city);
-    setIsOpen(false);
-  };
-
   const filtered = cities.filter((c) =>
     c.name.toLowerCase().includes(query.toLowerCase())
   );
 
-  const handleFocus = () => {
-    if (!isOpen) setIsOpen(true);
-  };
-
-
-  const getPlaceholderText = () => {
-    if (selectedCity) {
-      return selectedCity.name; 
-    }
-    return "Search or select a city..."; 
+  const handleSelect = (city) => {
+    const loc = locations.find((l) => l.name === city.name);
+    onSelect(loc || city);
+    setIsOpen(false);
+    setQuery(""); // clear search
   };
 
   return (
@@ -103,30 +94,36 @@ export default function CitySelector({ onSelect, selectedCity }) {
         borderRadius="md"
         px={3}
         py={2}
-        bg={bgColor}
+        cursor="pointer"
         borderColor={borderColor}
+        bg={bgColor}
         color={textColor}
-        cursor="text"
-        transition="all 0.2s"
+        onClick={() => setIsOpen(!isOpen)}
         _hover={{ borderColor: "blue.400" }}
-        _focusWithin={{ borderColor: "blue.500" }}
+        transition="all 0.2s"
       >
         <SearchIcon color="gray.400" mr={2} />
         <Input
-          placeholder={getPlaceholderText()}
-          value={query}
-          onFocus={handleFocus}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            if (!isOpen) setIsOpen(true); 
-          }}
-          variant="unstyled"
+          placeholder="Search or select a city..."
+          value={isOpen ? query : value?.name || ""}
+          onChange={(e) => setQuery(e.target.value)}
+          border="none"
+          bg="transparent"
           color={textColor}
           _placeholder={{ color: placeholderColor }}
-          flex="1"
+          _focus={{ boxShadow: "none" }}
+          cursor="pointer"
+        />
+        <IconButton
+          icon={isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+          variant="ghost"
+          size="sm"
+          aria-label="toggle"
+          colorScheme="gray"
         />
       </Flex>
 
+      {/* 🔹 Dropdown list */}
       {isOpen && (
         <Box
           position="absolute"
@@ -140,24 +137,22 @@ export default function CitySelector({ onSelect, selectedCity }) {
           borderColor={borderColor}
           shadow="md"
           zIndex={10}
-          transition="all 0.2s"
+          p={2}
         >
           {loading ? (
             <Flex justify="center" py={4}>
               <Spinner size="sm" />
             </Flex>
           ) : filtered.length > 0 ? (
-            <List maxH="200px" overflowY="auto">
+            <List maxH="180px" overflowY="auto">
               {filtered.map((c) => (
                 <ListItem
-                  key={`${c.lat}-${c.lon}`}
-                  px={3}
-                  py={2}
+                  key={c.name}
+                  p={2}
                   borderRadius="md"
                   cursor="pointer"
                   _hover={{ bg: hoverBg }}
                   onClick={() => handleSelect(c)}
-                  color={textColor}
                 >
                   {c.name}
                 </ListItem>
@@ -167,10 +162,10 @@ export default function CitySelector({ onSelect, selectedCity }) {
             <Text
               color={placeholderColor}
               textAlign="center"
-              py={3}
+              py={2}
               fontSize="sm"
             >
-              No results found
+              No results
             </Text>
           )}
         </Box>
