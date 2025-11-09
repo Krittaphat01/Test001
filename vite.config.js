@@ -8,4 +8,11 @@ export default defineConfig({
     include: ['react', 'react-dom'],
     force: true, // บังคับให้ Vite rebuild deps ใหม่
   },
+  test: {
+    globals: true,
+    environment: "jsdom", //  จำลอง DOM สำหรับ React
+    setupFiles: "./src/test/setup.js",
+    include: ["src/**/*.test.{js,jsx}"], // ✅ บอกว่า test อยู่ตรงไหน
+    testTimeout: 10000,
+  },
 })

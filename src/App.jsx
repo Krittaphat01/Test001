@@ -5,23 +5,24 @@ import {
   Heading,
   Button,
   Text,
+  Avatar,
+  Tooltip,
   useColorMode,
   useColorModeValue,
 } from "@chakra-ui/react";
 import { SunIcon, MoonIcon } from "@chakra-ui/icons";
 import { useEffect, useState } from "react";
-import { v4 as uuidv4 } from "uuid"; // ✅ ใช้สร้าง token แบบสุ่ม
+import { v4 as uuidv4 } from "uuid"; 
 
 import Dashboard from "./pages/Dashboard";
 import Locations from "./pages/Locations";
 
-// ✅ ฟังก์ชันสร้าง token แบบ guest
+// ฟังก์ชันสร้าง token แบบ guest
 function ensureGuestToken() {
   let token = localStorage.getItem("token");
   if (!token) {
     token = `guest_${uuidv4()}`;
     localStorage.setItem("token", token);
-    console.log("🆕 Created guest token:", token);
   }
   return token;
 }
@@ -30,18 +31,20 @@ function Navbar() {
   const { colorMode, toggleColorMode } = useColorMode();
   const headingColor = useColorModeValue("gray.800", "yellow.200");
   const headingIcon = colorMode === "light" ? "🌤️" : "🌙";
-  const [, setToken] = useState(localStorage.getItem("token"));
+  const [token, setToken] = useState(localStorage.getItem("token"));
 
   useEffect(() => {
     const guestToken = ensureGuestToken();
     setToken(guestToken);
   }, []);
+
+  const guestLabel = token ? token.split("_")[0] : "guest";
+
   return (
     <Flex justify="space-between" align="center" mb={6}>
       <Heading size="3xl" color={headingColor}>
         {headingIcon}
       </Heading>
-
       <Flex align="center" gap={3}>
         <Button as={Link} to="/" colorScheme="blue" variant="outline">
           Locations
@@ -52,6 +55,24 @@ function Navbar() {
         <Button onClick={toggleColorMode}>
           {colorMode === "light" ? <MoonIcon /> : <SunIcon />}
         </Button>
+        <Tooltip
+          label={`Token: ${token}`}
+          aria-label="Guest token"
+          placement="bottom"
+          hasArrow
+        >
+          <Flex align="center" gap={2}>
+            <Avatar
+              size="sm"
+              name={guestLabel}
+              bg={useColorModeValue("blue.500", "blue.300")}
+              color="white"
+            />
+            <Text fontSize="sm" color="gray.500">
+              {guestLabel}
+            </Text>
+          </Flex>
+        </Tooltip>
       </Flex>
     </Flex>
   );
