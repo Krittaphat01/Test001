@@ -41,11 +41,11 @@ function Navbar() {
   const guestLabel = token ? token.split("_")[0] : "guest";
 
   return (
-    <Flex justify="space-between" align="center" mb={6}>
+    <Flex justify="space-between" align="center" mb={6} pr={4}>
       <Heading size="3xl" color={headingColor}>
         {headingIcon}
       </Heading>
-      <Flex align="center" gap={3}>
+      <Flex align="center" gap={2}>
         <Button as={Link} to="/" colorScheme="blue" variant="outline">
           Locations
         </Button>
@@ -68,9 +68,6 @@ function Navbar() {
               bg={useColorModeValue("blue.500", "blue.300")}
               color="white"
             />
-            <Text fontSize="sm" color="gray.500">
-              {guestLabel}
-            </Text>
           </Flex>
         </Tooltip>
       </Flex>
